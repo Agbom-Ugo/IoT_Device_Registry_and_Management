@@ -135,3 +135,65 @@
     (ok true)
   )
 )
+
+;; Device Access Control
+(define-public (grant-device-access
+  (device-id (buff 32))
+  (authorized-user principal)
+  (access-level (string-ascii 20))
+  (duration uint)
+)
+  (let 
+    (
+      (device (unwrap! (map-get? devices { device-id: device-id }) ERR-DEVICE-NOT-FOUND))
+    )
+    
+    (asserts! (is-eq tx-sender (get owner device)) ERR-UNAUTHORIZED)
+    
+    (map-set device-access-control
+      { device-id: device-id, authorized-user: authorized-user }
+      {
+        access-level: access-level,
+        expiration-block: (+ stacks-block-height duration)
+      }
+    )
+    
+    (ok true)
+  )
+)
+
+;; Advanced Device Interaction Tracking
+(define-map device-interactions
+  { device-id: (buff 32), interaction-type: (string-ascii 50) }
+  {
+    interaction-count: uint,
+    last-interaction-timestamp: uint
+  }
+)
+
+;; Record Device Interaction
+(define-public (record-device-interaction
+  (device-id (buff 32))
+  (interaction-type (string-ascii 50))
+)
+  (let 
+    (
+      (current-interaction 
+        (default-to 
+          { interaction-count: u0, last-interaction-timestamp: stacks-block-height }
+          (map-get? device-interactions { device-id: device-id, interaction-type: interaction-type })
+        )
+      )
+    )
+    
+    (map-set device-interactions
+      { device-id: device-id, interaction-type: interaction-type }
+      {
+        interaction-count: (+ (get interaction-count current-interaction) u1),
+        last-interaction-timestamp: stacks-block-height
+      }
+    )
+    
+    (ok true)
+  )
+)
